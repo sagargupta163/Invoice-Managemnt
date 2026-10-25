@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invoice Manager</title>
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--ink:#14202e;--muted:#58677a;--line:#d6dde6;--accent:#1d4f91;--accent-ink:#fff;--ok:#1f8a5b;--warn:#b7791f;--danger:#b3372f;--soft:#e2ebf7;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1620;--surface:#18222f;--ink:#e7eef7;--muted:#9aabbe;--line:#2a394b;--accent:#7db1f2;--accent-ink:#071a33;--ok:#4cc38a;--warn:#e8b04a;--danger:#ef7b73;--soft:#1d3047}}
+:root[data-theme="dark"]{--bg:#0f1620;--surface:#18222f;--ink:#e7eef7;--muted:#9aabbe;--line:#2a394b;--accent:#7db1f2;--accent-ink:#071a33;--ok:#4cc38a;--warn:#e8b04a;--danger:#ef7b73;--soft:#1d3047}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:28px 18px 60px}
+h1{font-size:1.9rem;margin:0 0 4px;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:0 0 22px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-width:130px}
+.stat b{display:block;font-size:1.45rem;line-height:1.2}
+.stat span{color:var(--muted);font-size:.85rem}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:18px}
+.panel h2{font-size:1.05rem;margin:0 0 12px}
+details.panel summary{cursor:pointer;font-weight:600}
+form,.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;align-items:end}
+.grid{margin-top:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.88rem;color:var(--muted);min-width:0}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px;min-width:0;width:100%}
+input[readonly]{opacity:.8;font-weight:600}
+.btns{display:flex;gap:8px;grid-column:1/-1}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.del{color:var(--danger)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.err{color:var(--danger);font-size:.88rem;min-height:1.3em;margin:8px 0 0}
+.hint{color:var(--muted);font-size:.85rem;margin:0 0 10px}
+.tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.tools input{flex:1;min-width:160px;width:auto}
+.tools select{width:auto}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:1700px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.82rem;white-space:nowrap}
+td.n{text-align:right;white-space:nowrap}th.n{text-align:right}
+td.id{color:var(--muted)}
+td.d{color:var(--muted);white-space:nowrap}
+.fk{color:var(--muted);font-size:.8rem;display:block}
+.tag{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.8rem;border:1px solid currentColor;margin-top:2px}
+.tag.ok{color:var(--ok)}.tag.warn{color:var(--warn)}.tag.no{color:var(--danger)}
+.act{display:flex;gap:6px}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.schema th,.schema td{font-size:.88rem}
+code{background:var(--soft);padding:1px 6px;border-radius:5px;font-size:.85rem}
+.mini{margin-top:12px;min-width:0}
+.mini td{padding:6px 8px}
+@media (prefers-reduced-motion:no-preference){tr.flash{animation:fl 1.1s}@keyframes fl{from{background:var(--soft)}to{background:transparent}}}
+</style>
+</head>
+<body>
+<main>
+<h1>Invoice Manager</h1>
+<p class="sub">Create invoices from estimations, track payments and balances. Data is stored in the browser on this device.</p>
+
+<div class="stats" id="stats"></div>
+
+<section class="panel">
+<h2 id="formTitle">Add an invoice</h2>
+<p class="hint">Pick the company, then the estimation. The service, quantity, cost and delivery details fill in automatically and you can change them.</p>
+<form id="f" novalidate>
+<label>Invoice_no (4 digits, unique)<input id="ino" type="number" min="1000" max="9999" step="1"></label>
+<label>chain_id (company)<select id="chain"></select></label>
+<label>estimated_id (estimation)<select id="est"></select></label>
+<label>service_details (max 50)<input id="svc" maxlength="50" autocomplete="off"></label>
+<label>qty<input id="qty" type="number" min="1" step="1"></label>
+<label>cost_per_qty<input id="cpq" type="number" min="0" step="0.01"></label>
+<label>amount_payable (qty × cost_per_qty)<input id="pay" readonly value="0.00"></label>
+<label>Amount paid so far (used to work out balance)<input id="paid" type="number" min="0" step="0.01" value="0"></label>
+<label>balance<input id="bal" readonly value="0.00"></label>
+<label>date_of_payment (leave empty if unpaid)<input id="dop" type="datetime-local"></label>
+<label>date_of_service<input id="dos" type="date"></label>
+<label>Delivery_details (max 100)<input id="dd" maxlength="100" autocomplete="off" placeholder="Address and delivery notes"></label>
+<label>email_id (max 50)<input id="em" type="text" inputmode="email" maxlength="50" autocomplete="off" placeholder="client@example.com"></label>
+<div class="btns"><button class="primary" type="submit" id="save">Add invoice</button><button type="button" id="cancel" hidden>Cancel edit</button></div>
+</form>
+<p class="err" id="err" role="alert"></p>
+</section>
+
+<details class="panel">
+<summary>Companies (chain table) and Estimations (estimate table) used for the links</summary>
+<div class="grid">
+<label>company_name<input id="cname" maxlength="255" autocomplete="off" placeholder="Company name"></label>
+<button class="primary" type="button" id="cadd">Add company</button>
+</div>
+<p class="err" id="cerr" role="alert"></p>
+<div class="wrap"><table class="schema mini"><thead><tr><th>chain_id</th><th>company_name</th><th></th></tr></thead><tbody id="crows"></tbody></table></div>
+<div class="grid">
+<label>Company<select id="ec"></select></label>
+<label>service<input id="es" maxlength="100" autocomplete="off" placeholder="Service"></label>
+<label>qty<input id="eq" type="number" min="1" step="1"></label>
+<label>cost_per_unit<input id="ep" type="number" min="0" step="0.01"></label>
+<label>delivery_date<input id="ed" type="date"></label>
+<label>delivery_details<input id="et" maxlength="100" autocomplete="off"></label>
+<button class="primary" type="button" id="eadd">Add estimation</button>
+</div>
+<p class="err" id="eerr" role="alert"></p>
+<div class="wrap"><table class="schema mini"><thead><tr><th>estimated_id</th><th>chain_id</th><th>service</th><th>qty × cost</th><th></th></tr></thead><tbody id="erows"></tbody></table></div>
+</details>
+
+<section class="panel">
+<div class="tools">
+<input id="q" placeholder="Search by invoice number, service or email" aria-label="Search invoices">
+<select id="fc" aria-label="Filter by company"></select>
+<select id="fs" aria-label="Filter by payment status"><option value="all">All payments</option><option value="paid">Paid</option><option value="part">Partly paid</option><option value="unpaid">Unpaid</option></select>
+</div>
+<div class="wrap"><table>
+<thead><tr><th>id</th><th>Invoice_no</th><th>estimated_id</th><th>chain_id</th><th>service_details</th><th class="n">qty</th><th class="n">cost_per_qty</th><th class="n">amount_payable</th><th class="n">balance</th><th>date_of_payment</th><th>date_of_service</th><th>Delivery_details</th><th>email_id</th><th>Actions</th></tr></thead>
+<tbody id="rows"></tbody>
+</table></div>
+<div class="empty" id="empty" hidden>No invoices match. Add an invoice above to get started.</div>
+</section>
+
+<section class="panel">
+<h2>Table design: Invoice</h2>
+<div class="wrap"><table class="schema" style="min-width:560px">
+<thead><tr><th>Column Name</th><th>Datatype</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>id</code></td><td>int (PK, auto_increment)</td><td>Unique id of the invoice. Auto-numbered here.</td></tr>
+<tr><td><code>Invoice_no</code></td><td>int</td><td>Four-digit unique invoice number.</td></tr>
+<tr><td><code>estimated_id</code></td><td>int (FK)</td><td>Id of the estimate, from the estimate table.</td></tr>
+<tr><td><code>chain_id</code></td><td>int (FK)</td><td>Chain id of the company, from the chain table.</td></tr>
+<tr><td><code>service_details</code></td><td>varchar(50)</td><td>All details related to the service offered.</td></tr>
+<tr><td><code>qty</code></td><td>int</td><td>The quantity.</td></tr>
+<tr><td><code>cost_per_qty</code></td><td>float</td><td>The cost per quantity.</td></tr>
+<tr><td><code>amount_payable</code></td><td>float</td><td>Total amount to be paid by the client.</td></tr>
+<tr><td><code>balance</code></td><td>float</td><td>Balance amount in case of partial payment by the client.</td></tr>
+<tr><td><code>date_of_payment</code></td><td>datetime</td><td>Date and time on which the amount is paid.</td></tr>
+<tr><td><code>date_of_service</code></td><td>date</td><td>Date on which the service can be delivered.</td></tr>
+<tr><td><code>Delivery_details</code></td><td>varchar(100)</td><td>Delivery details such as address and other related details.</td></tr>
+<tr><td><code>email_id</code></td><td>varchar(50)</td><td>Email on which the invoice details are to be sent.</td></tr>
+</tbody></table></div>
+</section>
+</main>
+
+<script>
+(function(){
+var KEY="invoice_table_v1", inv=[], chains=[], ests=[], nextI=1, nextC=1, nextE=1, editId=null, flashId=null;
+var $=function(i){return document.getElementById(i)};
+var EM=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function load(){
+  try{var r=localStorage.getItem(KEY); if(r){var o=JSON.parse(r); inv=o.inv||[]; chains=o.chains||[]; ests=o.ests||[]; nextI=o.nextI||1; nextC=o.nextC||1; nextE=o.nextE||1; return;}}catch(e){}
+  var t=Date.now();
+  chains=[{chain_id:1,company_name:"Sharma Traders Pvt Ltd"},{chain_id:2,company_name:"Nagpur Fresh Mart"}]; nextC=3;
+  ests=[{estimated_id:1,chain_id:2,service:"Shop signage installation",qty:4,cost_per_unit:12500,delivery_date:"2026-11-15",delivery_details:"Deliver to store back gate"},
+        {estimated_id:2,chain_id:1,service:"Display rack setup",qty:10,cost_per_unit:3200.5,delivery_date:"2026-12-01",delivery_details:"Call before delivery"}]; nextE=3;
+  inv=[{id:1,Invoice_no:1001,estimated_id:1,chain_id:2,service_details:"Shop signage installation",qty:4,cost_per_qty:12500,amount_payable:50000,balance:20000,date_of_payment:"2026-10-20T11:30",date_of_service:"2026-11-15",Delivery_details:"Deliver to store back gate",email_id:"accounts@freshmart.example",created:t}]; nextI=2;
+}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify({inv:inv,chains:chains,ests:ests,nextI:nextI,nextC:nextC,nextE:nextE}));}catch(e){}}
+function money(n){return Number(n).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function r2(n){return Math.round(n*100)/100}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function fi(id){return inv.filter(function(g){return g.id===id})[0]}
+function fch(id){return chains.filter(function(c){return c.chain_id===id})[0]}
+function fes(id){return ests.filter(function(c){return c.estimated_id===id})[0]}
+function pdt(s){return s?s.replace("T"," "):"—"}
+function nextNo(){var m=1000;inv.forEach(function(x){if(x.Invoice_no>m)m=x.Invoice_no});return m+1}
+
+function calc(){
+  var pay=r2((+$("qty").value||0)*(+$("cpq").value||0)), paid=+$("paid").value||0;
+  $("pay").value=money(pay); $("bal").value=money(Math.max(0,r2(pay-paid)));
+  return {pay:pay,bal:Math.max(0,r2(pay-paid))};
+}
+function fillEst(){
+  var id=+$("est").value, e=fes(id); if(!e)return;
+  $("svc").value=e.service.slice(0,50); $("qty").value=e.qty; $("cpq").value=e.cost_per_unit; $("dos").value=e.delivery_date; $("dd").value=e.delivery_details; calc();
+}
+function estOptions(){
+  var c=+$("chain").value, cur=$("est").value;
+  var list=ests.filter(function(e){return e.chain_id===c});
+  $("est").innerHTML='<option value="">'+(c?(list.length?"Select an estimation":"No estimations for this company"):"Select a company first")+'</option>'+list.map(function(e){return '<option value="'+e.estimated_id+'">'+e.estimated_id+' – '+esc(e.service)+'</option>'}).join("");
+  $("est").value=cur; if(!$("est").value)$("est").value="";
+}
+function copts(first){return first+chains.map(function(c){return '<option value="'+c.chain_id+'">'+c.chain_id+' – '+esc(c.company_name)+'</option>'}).join("")}
+
+function renderLinks(){
+  var a=$("chain").value, b=$("fc").value, c=$("ec").value;
+  $("chain").innerHTML=copts('<option value="">Select a company</option>');
+  $("fc").innerHTML=copts('<option value="all">All companies</option>');
+  $("ec").innerHTML=copts('<option value="">Select a company</option>');
+  $("chain").value=a;if(!$("chain").value)$("chain").value="";
+  $("fc").value=b||"all";if(!$("fc").value)$("fc").value="all";
+  $("ec").value=c;if(!$("ec").value)$("ec").value="";
+  estOptions();
+  $("crows").innerHTML=chains.map(function(c){return '<tr><td>'+c.chain_id+'</td><td>'+esc(c.company_name)+'</td><td><button class="del" data-c="'+c.chain_id+'">Delete</button></td></tr>'}).join("");
+  $("erows").innerHTML=ests.map(function(e){return '<tr><td>'+e.estimated_id+'</td><td>'+e.chain_id+'</td><td>'+esc(e.service)+'</td><td>'+e.qty+' × '+money(e.cost_per_unit)+'</td><td><button class="del" data-e="'+e.estimated_id+'">Delete</button></td></tr>'}).join("");
+}
+function status(g){return g.balance<=0?"paid":(g.balance<g.amount_payable?"part":"unpaid")}
+function render(){
+  var q=$("q").value.trim().toLowerCase(), c=$("fc").value, s=$("fs").value;
+  var list=inv.filter(function(g){
+    var hay=(g.Invoice_no+" "+g.service_details+" "+g.email_id).toLowerCase();
+    return (!q||hay.indexOf(q)>-1)&&(c==="all"||String(g.chain_id)===c)&&(s==="all"||status(g)===s);
+  });
+  $("rows").innerHTML=list.map(function(g){
+    var co=fch(g.chain_id), st=status(g), tag=st==="paid"?'<span class="tag ok">Paid</span>':st==="part"?'<span class="tag warn">Partly paid</span>':'<span class="tag no">Unpaid</span>';
+    return '<tr'+(g.id===flashId?' class="flash"':'')+'><td class="id">'+g.id+'</td><td><b>'+g.Invoice_no+'</b></td><td>'+g.estimated_id+'</td>'
+    +'<td>'+g.chain_id+'<span class="fk">'+(co?esc(co.company_name):"")+'</span></td><td>'+esc(g.service_details)+'</td>'
+    +'<td class="n">'+g.qty+'</td><td class="n">'+money(g.cost_per_qty)+'</td><td class="n"><b>'+money(g.amount_payable)+'</b></td>'
+    +'<td class="n">'+money(g.balance)+'<br>'+tag+'</td><td class="d">'+pdt(g.date_of_payment)+'</td><td class="d">'+esc(g.date_of_service)+'</td>'
+    +'<td>'+esc(g.Delivery_details)+'</td><td>'+esc(g.email_id)+'</td>'
+    +'<td><div class="act"><button data-a="edit" data-id="'+g.id+'">Edit</button><button class="del" data-a="del" data-id="'+g.id+'">Delete</button></div></td></tr>';
+  }).join("");
+  $("empty").hidden=list.length>0;
+  var tp=inv.reduce(function(s,g){return s+g.amount_payable},0), tb=inv.reduce(function(s,g){return s+g.balance},0);
+  $("stats").innerHTML='<div class="stat"><b>'+inv.length+'</b><span>Invoices</span></div><div class="stat"><b>₹'+money(tp)+'</b><span>Total payable</span></div><div class="stat"><b>₹'+money(tb)+'</b><span>Balance pending</span></div>';
+}
+function resetForm(){
+  editId=null;["svc","qty","cpq","dop","dos","dd","em"].forEach(function(i){$(i).value=""});
+  $("chain").value="";estOptions();$("paid").value="0";$("ino").value=nextNo();calc();
+  $("save").textContent="Add invoice";$("formTitle").textContent="Add an invoice";$("cancel").hidden=true;$("err").textContent="";
+}
+
+$("chain").addEventListener("change",function(){$("est").value="";estOptions();});
+$("est").addEventListener("change",fillEst);
+["qty","cpq","paid"].forEach(function(i){$(i).addEventListener("input",calc)});
+$("f").addEventListener("submit",function(e){
+  e.preventDefault();
+  var err=$("err"), no=parseInt($("ino").value,10), cid=+$("chain").value, eid=+$("est").value;
+  var svc=$("svc").value.trim(), qty=parseInt($("qty").value,10), cpq=parseFloat($("cpq").value), dd=$("dd").value.trim(), em=$("em").value.trim(), dos=$("dos").value, paid=+$("paid").value||0;
+  if(!(no>=1000&&no<=9999)){err.textContent="Invoice number must be a 4-digit number (1000 to 9999).";return;}
+  if(inv.some(function(x){return x.Invoice_no===no&&x.id!==editId})){err.textContent="Invoice number "+no+" is already used. Invoice numbers must be unique.";return;}
+  if(!cid||!fch(cid)){err.textContent="Select the company for this invoice.";return;}
+  if(!eid||!fes(eid)){err.textContent="Select the estimation for this invoice.";return;}
+  if(!svc){err.textContent="Enter the service details.";return;}
+  if(!(qty>0)){err.textContent="Enter a quantity of 1 or more.";return;}
+  if(isNaN(cpq)||cpq<0){err.textContent="Enter the cost per quantity.";return;}
+  if(!dos){err.textContent="Select the date of service.";return;}
+  if(!dd){err.textContent="Enter the delivery details.";return;}
+  if(!em||!EM.test(em)){err.textContent="Enter a valid email address, for example client@example.com.";return;}
+  var c=calc();
+  if(paid>c.pay){err.textContent="Amount paid cannot be more than the amount payable.";return;}
+  if(paid>0&&!$("dop").value){err.textContent="Enter the date of payment, since some amount has been paid.";return;}
+  var rec={Invoice_no:no,estimated_id:eid,chain_id:cid,service_details:svc,qty:qty,cost_per_qty:cpq,amount_payable:c.pay,balance:c.bal,date_of_payment:paid>0?$("dop").value:"",date_of_service:dos,Delivery_details:dd,email_id:em};
+  if(editId){var g=fi(editId);for(var k in rec)g[k]=rec[k];flashId=g.id;}
+  else{rec.id=nextI;rec.created=Date.now();inv.push(rec);flashId=nextI;nextI++;}
+  persist();resetForm();renderLinks();render();
+});
+$("cancel").addEventListener("click",resetForm);
+$("q").addEventListener("input",render);
+$("fc").addEventListener("change",render);
+$("fs").addEventListener("change",render);
+$("rows").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-a]");if(!b)return;
+  var id=+b.getAttribute("data-id"),g=fi(id),a=b.getAttribute("data-a");
+  if(a==="edit"){
+    editId=id;$("chain").value=String(g.chain_id);estOptions();$("est").value=String(g.estimated_id);
+    $("ino").value=g.Invoice_no;$("svc").value=g.service_details;$("qty").value=g.qty;$("cpq").value=g.cost_per_qty;
+    $("paid").value=r2(g.amount_payable-g.balance);$("dop").value=g.date_of_payment||"";$("dos").value=g.date_of_service;$("dd").value=g.Delivery_details;$("em").value=g.email_id;
+    calc();$("save").textContent="Save changes";$("formTitle").textContent="Edit invoice #"+g.Invoice_no;$("cancel").hidden=false;$("err").textContent="";$("svc").focus();window.scrollTo({top:0,behavior:"smooth"});
+  }else if(a==="del"){if(confirm('Delete invoice '+g.Invoice_no+'?')){inv=inv.filter(function(x){return x.id!==id});if(editId===id)resetForm();persist();render();}}
+});
+$("cadd").addEventListener("click",function(){
+  var n=$("cname").value.trim(), err=$("cerr");
+  if(!n){err.textContent="Enter the company name.";return;}
+  if(chains.some(function(c){return c.company_name.toLowerCase()===n.toLowerCase()})){err.textContent="This company already exists.";return;}
+  chains.push({chain_id:nextC++,company_name:n});$("cname").value="";err.textContent="";persist();renderLinks();
+});
+$("eadd").addEventListener("click",function(){
+  var err=$("eerr"), c=+$("ec").value, s=$("es").value.trim(), q=parseInt($("eq").value,10), p=parseFloat($("ep").value), d=$("ed").value, t=$("et").value.trim();
+  if(!c||!fch(c)){err.textContent="Select a company for the estimation.";return;}
+  if(!s||!(q>0)||isNaN(p)||p<0||!d||!t){err.textContent="Fill in the service, quantity, cost per unit, delivery date and delivery details.";return;}
+  ests.push({estimated_id:nextE++,chain_id:c,service:s,qty:q,cost_per_unit:p,delivery_date:d,delivery_details:t});
+  ["es","eq","ep","ed","et"].forEach(function(i){$(i).value=""});err.textContent="";persist();renderLinks();
+});
+$("crows").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-c]");if(!b)return;var id=+b.getAttribute("data-c");
+  if(ests.some(function(x){return x.chain_id===id})||inv.some(function(x){return x.chain_id===id})){$("cerr").textContent="This company still has estimations or invoices. Delete those first.";return;}
+  chains=chains.filter(function(c){return c.chain_id!==id});$("cerr").textContent="";persist();renderLinks();
+});
+$("erows").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-e]");if(!b)return;var id=+b.getAttribute("data-e");
+  if(inv.some(function(x){return x.estimated_id===id})){$("eerr").textContent="An invoice uses this estimation. Delete the invoice first.";return;}
+  ests=ests.filter(function(c){return c.estimated_id!==id});$("eerr").textContent="";persist();renderLinks();
+});
+load();renderLinks();render();resetForm();
+})();
+</script>
+</body>
+</html>
